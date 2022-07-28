@@ -1,0 +1,5 @@
+module USpoof {
+    header "uspoof.h"
+    link "icui18n"
+    export *
+}
