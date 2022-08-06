@@ -22,7 +22,8 @@ let package = Package(
     .library(name: "WebURLSpoofCheck", targets: ["WebURLSpoofCheck"]),
   ],
   dependencies: [
-    .package(name: "swift-url", path: "../swift-url"),
+    .package(url: "https://github.com/karwa/swift-url.git", .upToNextMinor(from: "0.4.0")),
+//    .package(name: "swift-url", path: "../swift-url"),
   ],
   targets: [
     .systemLibrary(

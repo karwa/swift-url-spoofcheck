@@ -24,7 +24,8 @@ public struct SpoofCheckedRenderer: WebURL.Domain.Renderer {
   public mutating func processLabel(_ label: inout Label, isEnd: Bool) {
 
     defer {
-      if topLevelDomain == nil { topLevelDomain = label.unicode /* TODO: Make unique? */ }
+      // TODO: Handle FQDNs (empty last label)
+      if topLevelDomain == nil { topLevelDomain = String(label.unicode) }
     }
 
     guard label.isIDN else {
