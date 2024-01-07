@@ -19,20 +19,29 @@ import WebURL
 public struct SpoofCheckedRenderer: WebURL.Domain.Renderer {
 
   public var result = ""
-  private var topLevelDomain: Optional<String> = .none
+  private var _topLevelDomain: Optional<String> = .none
 
   public mutating func processLabel(_ label: inout Label, isEnd: Bool) {
 
-    defer {
-      // TODO: Handle FQDNs (empty last label)
-      if topLevelDomain == nil { topLevelDomain = String(label.unicode) }
+    let tld: String
+
+    if let topLevelDomain = _topLevelDomain {
+      tld = topLevelDomain
+    } else {
+      if result.isEmpty, label.ascii.isEmpty {
+        // Rightmost label is empty. This is a Fully-Qualified Domain Name (FQDN).
+        result = "."
+        return
+      }
+      tld = label.isIDN ? String(label.unicode) : String(label.ascii)
+      self._topLevelDomain = tld
     }
 
     guard label.isIDN else {
       result.insert(contentsOf: label.asciiWithLeadingDelimiter, at: result.startIndex)
       return
     }
-    switch IDNSpoofChecker.shared.isSafeToDisplayAsUnicode(&label, topLevelDomain: topLevelDomain) {
+    switch IDNSpoofChecker.shared.isSafeToDisplayAsUnicode(&label, topLevelDomain: tld) {
     case .safe:
       result.insert(contentsOf: label.unicode, at: result.startIndex)
       if !isEnd { result.insert(".", at: result.startIndex) }

@@ -55,6 +55,11 @@ final class SpoofCheckedRendererTests: XCTestCase {
         ("pel·lícula.cat", "pel·lícula.cat", "pel·lícula.cat"),
         ("pel·lícula.com", "pel·lícula.com", "xn--pellcula-ioa55c.com"),
 
+        // Fully-qualified Domain Name (FQDN).
+        ("pel·lícula.cat.", "pel·lícula.cat.", "pel·lícula.cat."),
+        ("pel·lícula.cat..", "pel·lícula.cat..", "xn--pellcula-ioa55c.cat.."),
+        ("pel·lícula.com.", "pel·lícula.com.", "xn--pellcula-ioa55c.com."),
+
         // Digit lookalike.
         ("xn--16-1ik.com", "16კ.com", "xn--16-1ik.com"),
       ]

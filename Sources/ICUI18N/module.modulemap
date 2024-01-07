@@ -1,0 +1,5 @@
+// SwiftPM system library targets are super weird.
+//
+ module ICUI18N {
+   link "icui18n"
+ }

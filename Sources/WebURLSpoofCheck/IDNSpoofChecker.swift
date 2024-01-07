@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import USpoof
+import CUSpoof
 import WebURL
 
 /// An object which checks domain labels for possible spoofing attempts.
@@ -40,7 +40,6 @@ internal final class IDNSpoofChecker {
   // USpoofChecker.
   private let checker: OpaquePointer
   // UnicodeSets (all frozen).
-  private let icelandic_characters: OpaquePointer
   private let kana_letters_exceptions: OpaquePointer
   private let combining_diacritics_exceptions: OpaquePointer
   private let digit_lookalikes: OpaquePointer
@@ -50,7 +49,7 @@ internal final class IDNSpoofChecker {
     // === Checker ===
 
     var status = U_ZERO_ERROR
-    checker = uspoof_open_70(&status)!
+    checker = swift_url_uspoof_open(&status)!
     guard !status.isFailure else { return nil }
 
     // At this point, USpoofChecker has all the checks enabled except
@@ -65,15 +64,15 @@ internal final class IDNSpoofChecker {
     // Japanese, and {Hangul, Han} for Korean is treated as a single logical
     // script.
     // See http://www.unicode.org/reports/tr39/#Restriction_Level_Detection
-    uspoof_setRestrictionLevel_70(checker, USPOOF_HIGHLY_RESTRICTIVE)
+    swift_url_uspoof_setRestrictionLevel(checker, USPOOF_HIGHLY_RESTRICTIVE)
 
     // Sets allowed characters in IDN labels and turns on USPOOF_CHAR_LIMIT.
     IDNSpoofChecker.setAllowedCharacters(checker: checker, status: &status)
     guard !status.isFailure else { return nil }
 
     // Enable the return of auxillary (non-error) information.
-    let checks = uspoof_getChecks_70(checker, &status) | USPOOF_AUX_INFO.cValue
-    uspoof_setChecks_70(checker, checks, &status)
+    let checks = swift_url_uspoof_getChecks(checker, &status) | USPOOF_AUX_INFO.cValue
+    swift_url_uspoof_setChecks(checker, checks, &status)
     guard !status.isFailure else { return nil }
 
     // === Character sets ===
@@ -82,29 +81,17 @@ internal final class IDNSpoofChecker {
       var status = U_ZERO_ERROR
 
       let utf16Pattern = Array(pattern.utf16)
-      let set = uset_openPattern_70(utf16Pattern, Int32(utf16Pattern.count), &status)
-      uset_freeze_70(set)
+      let set = swift_url_uset_openPattern(utf16Pattern, Int32(utf16Pattern.count), &status)!
+      swift_url_uset_freeze(set)
 
       guard !status.isFailure else { return nil }
       return set
     }
 
-    // Unlike Chromium (which still uses IDNA transitional processing), we allow deviation characters.
-
     // These characters are, or look like, digits. A domain label entirely made of
     // digit-lookalikes or digits is blocked.
     if let set = makeSet(#"[θ२২੨੨૨೩೭շзҙӡउওਤ੩૩౩ဒვპੜკ੫丩ㄐճ৪੪୫૭୨౨]"#) {
       digit_lookalikes = set
-    } else {
-      return nil
-    }
-
-    // Latin small letter thorn ("þ", U+00FE) can be used to spoof both b and p.
-    // It's used in modern Icelandic orthography, so allow it for the Icelandic
-    // ccTLD (.is) but block in any other TLD. Also block Latin small letter eth
-    // ("ð", U+00F0) which can be used to spoof the letter o.
-    if let set = makeSet(#"[\u00fe\u00f0]"#) {
-      icelandic_characters = set
     } else {
       return nil
     }
@@ -128,8 +115,8 @@ internal final class IDNSpoofChecker {
 
   private static func setAllowedCharacters(checker: OpaquePointer, status: inout UErrorCode) {
 
-    let allowedChars = uset_openEmpty_70()
-    defer { uset_close_70(allowedChars) }
+    let allowedChars = swift_url_uset_openEmpty()!
+    defer { swift_url_uset_close(allowedChars) }
 
     // The recommended set is a set of characters for identifiers in a
     // security-sensitive environment taken from UTR 39
@@ -137,10 +124,10 @@ internal final class IDNSpoofChecker {
     // http://www.unicode.org/Public/security/latest/xidmodifications.txt .
     // The inclusion set comes from "Candidate Characters for Inclusion
     // in idenfiers" of UTR 31 (http://www.unicode.org/reports/tr31).
-    uset_addAll_70(allowedChars, uspoof_getRecommendedSet_70(&status))
+    swift_url_uset_addAll(allowedChars, swift_url_uspoof_getRecommendedSet(&status)!)
     guard !status.isFailure else { return }
 
-    uset_addAll_70(allowedChars, uspoof_getInclusionSet_70(&status))
+    swift_url_uset_addAll(allowedChars, swift_url_uspoof_getInclusionSet(&status)!)
     guard !status.isFailure else { return }
 
     // The sections below refer to Mozilla's IDN blacklist:
@@ -149,7 +136,7 @@ internal final class IDNSpoofChecker {
     // U+0338 (Combining Long Solidus Overlay) is included in the recommended set,
     // but is blacklisted by Mozilla. It is dropped because it can look like a
     // slash when rendered with a broken font.
-    uset_remove_70(allowedChars, 0x0338)
+    swift_url_uset_remove(allowedChars, 0x0338)
 
     // U+05F4 (Hebrew Punctuation Gershayim) is in the inclusion set, but is
     // blacklisted by Mozilla. We keep it, even though it can look like a double
@@ -158,27 +145,27 @@ internal final class IDNSpoofChecker {
 
     // The following 5 characters are disallowed because they're in NV8 (invalid
     // in IDNA 2008).
-    uset_remove_70(allowedChars, 0x058A)  // Armenian Hyphen
+    swift_url_uset_remove(allowedChars, 0x058A)  // Armenian Hyphen
     // U+2010 (Hyphen) is in the inclusion set, but we drop it because it can be
     // confused with an ASCII U+002D (Hyphen-Minus).
-    uset_remove_70(allowedChars, 0x2010)
+    swift_url_uset_remove(allowedChars, 0x2010)
     // U+2019 is hard to notice when sitting next to a regular character.
-    uset_remove_70(allowedChars, 0x2019)  // Right Single Quotation Mark
+    swift_url_uset_remove(allowedChars, 0x2019)  // Right Single Quotation Mark
     // U+2027 (Hyphenation Point) is in the inclusion set, but is blacklisted by
     // Mozilla. It is dropped, as it can be confused with U+30FB (Katakana Middle
     // Dot).
-    uset_remove_70(allowedChars, 0x2027)
-    uset_remove_70(allowedChars, 0x30A0)  // Katakana-Hiragana Double Hyphen
+    swift_url_uset_remove(allowedChars, 0x2027)
+    swift_url_uset_remove(allowedChars, 0x30A0)  // Katakana-Hiragana Double Hyphen
 
     // Block {Single,double}-quotation-mark look-alikes.
-    uset_remove_70(allowedChars, 0x02BB)  // Modifier Letter Turned Comma
-    uset_remove_70(allowedChars, 0x02BC)  // Modifier Letter Apostrophe
+    swift_url_uset_remove(allowedChars, 0x02BB)  // Modifier Letter Turned Comma
+    swift_url_uset_remove(allowedChars, 0x02BC)  // Modifier Letter Apostrophe
 
     // Block modifier letter voicing.
-    uset_remove_70(allowedChars, 0x02EC)
+    swift_url_uset_remove(allowedChars, 0x02EC)
 
     // Block historic character Latin Kra (also blocked by Mozilla).
-    uset_remove_70(allowedChars, 0x0138)
+    swift_url_uset_remove(allowedChars, 0x0138)
 
     // No need to block U+144A (Canadian Syllabics West-Cree P) separately
     // because it's blocked from mixing with other scripts including Latin.
@@ -189,25 +176,25 @@ internal final class IDNSpoofChecker {
       // set to prevent spoofing until the font issue is resolved.
 
       // Arabic letter KASHMIRI YEH. Not used in Arabic and Persian.
-      uset_remove_70(allowedChars, 0x0620)
+      swift_url_uset_remove(allowedChars, 0x0620)
 
       // Tibetan characters used for transliteration of ancient texts:
-      uset_remove_70(allowedChars, 0x0F8C)
-      uset_remove_70(allowedChars, 0x0F8D)
-      uset_remove_70(allowedChars, 0x0F8E)
-      uset_remove_70(allowedChars, 0x0F8F)
+      swift_url_uset_remove(allowedChars, 0x0F8C)
+      swift_url_uset_remove(allowedChars, 0x0F8D)
+      swift_url_uset_remove(allowedChars, 0x0F8E)
+      swift_url_uset_remove(allowedChars, 0x0F8F)
     #endif
 
     // Disallow extremely rarely used LGC character blocks.
     // Cyllic Ext A is not in the allowed set. Neither are Latin Ext-{C,E}.
-    uset_removeRange_70(allowedChars, 0x01CD, 0x01DC)  // Latin Ext B; Pinyin
-    uset_removeRange_70(allowedChars, 0x1C80, 0x1C8F)  // Cyrillic Extended-C
-    uset_removeRange_70(allowedChars, 0x1E00, 0x1E9B)  // Latin Extended Additional
-    uset_removeRange_70(allowedChars, 0x1F00, 0x1FFF)  // Greek Extended
-    uset_removeRange_70(allowedChars, 0xA640, 0xA69F)  // Cyrillic Extended-B
-    uset_removeRange_70(allowedChars, 0xA720, 0xA7FF)  // Latin Extended-D
+    swift_url_uset_removeRange(allowedChars, 0x01CD, 0x01DC)  // Latin Ext B; Pinyin
+    swift_url_uset_removeRange(allowedChars, 0x1C80, 0x1C8F)  // Cyrillic Extended-C
+    swift_url_uset_removeRange(allowedChars, 0x1E00, 0x1E9B)  // Latin Extended Additional
+    swift_url_uset_removeRange(allowedChars, 0x1F00, 0x1FFF)  // Greek Extended
+    swift_url_uset_removeRange(allowedChars, 0xA640, 0xA69F)  // Cyrillic Extended-B
+    swift_url_uset_removeRange(allowedChars, 0xA720, 0xA7FF)  // Latin Extended-D
 
-    uspoof_setAllowedChars_70(checker, allowedChars, &status)
+    swift_url_uspoof_setAllowedChars(checker, allowedChars, &status)
     guard !status.isFailure else { return }
   }
 }
@@ -228,14 +215,14 @@ extension IDNSpoofChecker {
   ///
   /// - parameters:
   ///   - label:          The label to check
-  ///   - topLevelDomain: The top-level segment of the domain, or `nil` if the TLD is not yet known.
+  ///   - topLevelDomain: The top-level segment of the domain.
   ///
   /// - returns: A result indicating which (if any) checks failed.
   ///            If the result is `.safe`, the label may be displayed in Unicode.
   ///            Otherwise, it is advisable to display as Punycode or some other way.
   ///
   public func isSafeToDisplayAsUnicode(
-    _ label: inout WebURL.Domain.Renderer.Label, topLevelDomain: String?
+    _ label: inout WebURL.Domain.Renderer.Label, topLevelDomain: String
   ) -> CheckResult {
 
     guard label.isIDN else {
@@ -249,7 +236,7 @@ extension IDNSpoofChecker {
     let icuResult = mutString.withUTF8 { utf8 in
       utf8.withMemoryRebound(to: CChar.self) { cchars in
         // Unfortunately, there is no buffer-of-scalars version of this API.
-        uspoof_checkUTF8_70(checker, cchars.baseAddress, Int32(cchars.count), nil, &status)
+        swift_url_uspoof_checkUTF8(checker, cchars.baseAddress, Int32(cchars.count), &status)
       }
     }
 
@@ -265,9 +252,12 @@ extension IDNSpoofChecker {
 
     // === TLD-Specific Rules ===
 
-    // Disallow Icelandic confusables for domains outside Iceland's ccTLD (.is).
+    // Latin small letter thorn ("þ", U+00FE) can be used to spoof both b and p.
+    // It's used in modern Icelandic orthography, so allow it for the Icelandic
+    // ccTLD (.is) but block in any other TLD. Also block Latin small letter eth
+    // ("ð", U+00F0) which can be used to spoof the letter o.
     if topLevelDomain != "is" {
-      if label.unicodeScalars.containsAnyFromICUSet(icelandic_characters) {
+      if label.unicodeScalars.contains("þ") || label.unicodeScalars.contains("ð") {
         return .tldSpecificCharacters
       }
     }
@@ -334,7 +324,7 @@ extension IDNSpoofChecker {
       if ("0"..."9").contains(scalar) {
         continue
       }
-      if uset_contains_70(digit_lookalikes, Int32(bitPattern: scalar.value)) != 0 {
+      if swift_url_uset_contains(digit_lookalikes, Int32(bitPattern: scalar.value)) != 0 {
         hasLookalike = true
       } else {
         return false
@@ -348,13 +338,13 @@ extension IDNSpoofChecker {
   ///
   /// See https://tools.ietf.org/html/rfc5892#appendix-A.3 for details.
   ///
-  private func hasUnsafeMiddleDot(_ scalars: [Unicode.Scalar], topLevelDomain: String?) -> Bool {
+  private func hasUnsafeMiddleDot(_ scalars: [Unicode.Scalar], topLevelDomain: String) -> Bool {
 
     var hasMiddleDot = false
     var start = scalars.startIndex
     while let middleDot = scalars[start...].firstIndex(of: "·") {
       // Middle dot must have a character before and after it.
-      guard middleDot > scalars.startIndex, middleDot < scalars.endIndex &- 1 else {
+      guard middleDot > scalars.startIndex, middleDot &+ 1 < scalars.endIndex else {
         return true
       }
       // And those characters must both be "l"

@@ -27,7 +27,7 @@ let package = Package(
   ],
   targets: [
     .systemLibrary(
-      name: "USpoof",
+      name: "ICUI18N",
       pkgConfig: "icu-i18n",
       providers: [
         .brewItem(["icu4c"]),
@@ -35,9 +35,13 @@ let package = Package(
       ]
     ),
     .target(
+      name: "CUSpoof",
+      dependencies: [.target(name: "ICUI18N")]
+    ),
+    .target(
       name: "WebURLSpoofCheck",
       dependencies: [
-        .target(name: "USpoof"),
+        .target(name: "CUSpoof"),
         .product(name: "WebURL", package: "swift-url")
       ]
     ),

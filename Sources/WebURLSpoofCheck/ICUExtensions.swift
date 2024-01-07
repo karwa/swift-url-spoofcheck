@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import USpoof
+import CUSpoof
 
 extension UErrorCode {
 
@@ -42,6 +42,6 @@ extension Sequence where Element == Unicode.Scalar {
   /// `set` must be an ICU `USet` object.
   ///
   func containsAnyFromICUSet(_ set: OpaquePointer) -> Bool {
-    contains(where: { uset_contains_70(set, Int32(bitPattern: $0.value)) != 0 })
+    contains(where: { swift_url_uset_contains(set, Int32(bitPattern: $0.value)) != 0 })
   }
 }
